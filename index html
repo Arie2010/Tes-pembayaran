@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WiFi Pay - Portal Pembayaran</title>
+    
+    <!-- PWA & Mobile Meta Tags -->
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WiFi Pay">
+    
+    <!-- Link ke Ikon & Manifest (Pastikan file logo & manifest ada di GitHub) -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logowifi.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .qris-active { animation: pulse-border 2s infinite; }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        #dynamic-qris-container img { margin: auto; border-radius: 12px; }
+    </style>
+
+    <script>
+        // Registrasi Service Worker PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
+            });
+        }
+    </script>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden min-h-[680px] flex flex-col relative pb-10">
+        
+        <!-- ==========================================
+             VIEW: LANDING (Jika link tanpa wilayah)
+             ========================================== -->
+        <div id="view-landing" class="hidden absolute inset-0 bg-white z-[100] flex flex-col items-center justify-center p-8 text-center fade-in">
+            <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-[2rem] flex items-center justify-center mb-6 shadow-xl shadow-blue-50">
+                <i data-lucide="layout-dashboard" class="w-10 h-10"></i>
+            </div>
+            <h2 class="text-2xl font-black text-gray-800 mb-3 leading-tight">Selamat Datang di<br><span class="text-blue-600">WiFi Pay Portal</span></h2>
+            <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4">
+                Silakan hubungi salah satu Admin kami untuk melakukan pembayaran dan sebutkan di wilayah mana Anda berada.
+            </p>
+            
+            <div class="w-full space-y-4">
+                <div class="text-left bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-1">Pilih Admin Tujuan</label>
+                    <select id="wa-admin-landing" class="w-full p-4 bg-white border border-gray-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer">
+                        <option value="6281234567890">Admin 1 (Budi)</option>
+                        <option value="6289876543210">Admin 2 (Siti)</option>
+                        <option value="6281112223334">Admin 3 (Pusat)</option>
+                    </select>
+                </div>
+                <button onclick="hubungiAdminLanding()" class="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-green-50 transition-all active:scale-95">
+                    <i data-lucide="message-circle" class="w-6 h-6"></i>
+                    Tanya Admin Sekarang
+                </button>
+            </div>
+        </div>
+
+        <!-- HEADER APLIKASI UTAMA -->
+        <header class="p-8 pb-4 text-center">
+            <div class="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-blue-200"><i data-lucide="wifi" class="w-8 h-8"></i></div>
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tight">WiFi Pay</h1>
+            <div id="region-badge" class="inline-block bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mt-2 border border-blue-100"></div>
+        </header>
+
+        <main class="p-8 pt-2 flex-1 overflow-y-auto">
+            <!-- STEP 1: Input Data -->
+            <div id="step-1" class="space-y-5 fade-in">
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block mb-1.5">Nama WiFi / SSID</label>
+                    <input type="text" id="wifi-name" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Contoh: WiFi_Rumah">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block mb-1.5">Nama Pengirim</label>
+                    <input type="text" id="sender-name" class="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Nama Anda / GoPay">
+                </div>
+                <div class="pt-4">
+                    <button onclick="toStep(2)" class="w-full bg-blue-600 text-white font-bold py-5 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95">Pilih Paket WiFi</button>
+                </div>
+            </div>
+
+            <!-- STEP 2: Pilih Paket -->
+            <div id="step-2" class="hidden space-y-4 fade-in">
+                <div id="package-list" class="space-y-3"></div>
+                <div class="flex gap-3 pt-6">
+                    <button onclick="toStep(1)" class="flex-1 bg-gray-100 text-gray-500 font-bold py-4 rounded-2xl active:scale-95">Kembali</button>
+                    <button id="btn-next" disabled onclick="toStep(3)" class="flex-[2] bg-blue-600 text-white font-bold py-4 rounded-2xl opacity-50 shadow-lg shadow-blue-100">Bayar Sekarang</button>
+                </div>
+            </div>
+
+            <!-- STEP 3: QRIS -->
+            <div id="step-3" class="hidden space-y-6 fade-in">
+                <div class="bg-gray-50 border border-gray-200 rounded-3xl p-5 text-center">
+                    <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">Scan QRIS Untuk Membayar</p>
+                    <div class="bg-white p-4 rounded-2xl inline-block border-4 border-blue-500 qris-active mb-4 flex items-center justify-center">
+                        <div id="dynamic-qris-container"></div>
+                    </div>
+                    <div class="bg-blue-600 text-white py-3 px-4 rounded-2xl shadow-lg shadow-blue-100">
+                        <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1">Total Tagihan:</p>
+                        <h3 id="display-total" class="text-2xl font-black">Rp 0</h3>
+                    </div>
+                </div>
+
+                <label class="w-full flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed border-blue-200 rounded-3xl cursor-pointer hover:bg-blue-50 transition-all">
+                    <div id="upload-status-icon" class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-2">
+                        <i data-lucide="camera" class="w-6 h-6"></i>
+                    </div>
+                    <span id="upload-text" class="text-xs font-bold text-blue-600">Unggah Bukti Transfer</span>
+                    <input type="file" id="input-image" accept="image/*" class="hidden" onchange="handleProof(this)">
+                </label>
+
+                <div class="flex gap-3">
+                    <button onclick="toStep(2)" class="flex-1 bg-gray-100 text-gray-500 font-bold py-5 rounded-2xl transition-all">Batal</button>
+                    <button id="btn-finish" disabled onclick="submitPayment()" class="flex-[2] bg-green-500 text-white font-bold py-5 rounded-2xl opacity-50 shadow-lg shadow-green-100">Konfirmasi</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW: SUKSES -->
+        <div id="view-success" class="hidden absolute inset-0 bg-white z-[300] flex flex-col items-center justify-center p-8 text-center fade-in">
+            <div class="w-20 h-20 bg-green-50 text-green-500 rounded-[2rem] flex items-center justify-center mb-6 shadow-xl shadow-green-50"><i data-lucide="check-circle" class="w-10 h-10"></i></div>
+            <h2 class="text-2xl font-black text-gray-800 mb-2">Berhasil Terkirim!</h2>
+            <p class="text-gray-500 text-xs mb-8 leading-relaxed px-4 font-medium">Laporan Anda sudah masuk ke sistem. WiFi akan segera diperpanjang oleh Admin.</p>
+            
+            <div class="w-full space-y-4">
+                <div class="text-left bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <label class="text-[9px] font-black text-gray-400 uppercase block mb-2 tracking-widest ml-1">Kabari Admin via WhatsApp</label>
+                    <select id="wa-admin-success" class="w-full p-4 bg-white border border-gray-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-green-500 shadow-sm appearance-none cursor-pointer">
+                        <!-- UBAH NOMOR ADMIN SUKSES DI SINI (62...) -->
+                        <option value="6289666600202">Admin Kantor</option>
+                        <option value="6289501233337">Admin Teknisi</option>
+                        <option value="62895321010615">Admin Pembayaran</option>
+                    </select>
+                </div>
+                <button onclick="kirimWASukses()" class="w-full bg-[#25D366] text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-green-50 active:scale-95 transition-all"><i data-lucide="message-circle" class="w-6 h-6"></i> Kabari Admin</button>
+                <button onclick="location.reload()" class="w-full bg-gray-100 text-gray-500 font-bold py-4 rounded-2xl transition-all active:scale-95">Selesai</button>
+            </div>
+        </div>
+
+        <!-- LOADING OVERLAY -->
+        <div id="loading" class="hidden absolute inset-0 bg-white/90 z-[500] flex flex-col items-center justify-center backdrop-blur-sm">
+            <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js';
+        import { getFirestore, doc, collection, addDoc, serverTimestamp, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+
+        // =================================================================
+        // MASUKKAN FIREBASE CONFIG ANDA DI SINI
+        // =================================================================
+        const firebaseConfig = { apiKey: "AIzaSyAG0Hvd_63itgiOXP4GBjgQG4MhkbWXedc", authDomain: "wifi-pay.firebaseapp.com", projectId: "wifi-pay", storageBucket: "wifi-pay.firebasestorage.app", messagingSenderId: "678974524617", appId: "1:678974524617:web:908268390ed189362ad118" };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let globalSettings = null;
+        window.selectedPackage = null;
+        window.selectedRegion = null;
+        window.proofBase64 = null;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetRegionName = urlParams.get('w');
+
+        onAuthStateChanged(auth, (u) => { if(u) listenSettings(); });
+        signInAnonymously(auth);
+
+        function listenSettings() {
+            onSnapshot(doc(db, 'config', 'settings'), (snap) => {
+                if (snap.exists()) {
+                    globalSettings = snap.data();
+                    if (targetRegionName) {
+                        window.selectedRegion = globalSettings.regions.find(r => r.name.toLowerCase() === targetRegionName.toLowerCase());
+                        if (window.selectedRegion) {
+                            document.getElementById('region-badge').innerText = "Area: " + window.selectedRegion.name;
+                            document.getElementById('view-landing').classList.add('hidden');
+                        } else { document.getElementById('view-landing').classList.remove('hidden'); }
+                    } else { document.getElementById('view-landing').classList.remove('hidden'); }
+                }
+            });
+        }
+
+        // TANYA ADMIN DI LANDING PAGE
+        window.hubungiAdminLanding = () => {
+            const noWA = document.getElementById('wa-admin-landing').value;
+            const text = "Halo Admin, saya ingin melakukan pembayaran WiFi. Saya berada di daerah: [Tuliskan Nama Daerah Anda]";
+            window.open(`https://wa.me/${noWA}?text=${encodeURIComponent(text)}`, '_blank');
+        };
+
+        window.toStep = (n) => {
+            if (n === 2) {
+                if (!document.getElementById('wifi-name').value || !document.getElementById('sender-name').value) return alert("Lengkapi data!");
+                renderPackages();
+            }
+            if (n === 3) {
+                const container = document.getElementById('dynamic-qris-container');
+                container.innerHTML = "";
+                const qrisFinal = makeDynamicQris(globalSettings.qrisString, window.selectedPackage.price);
+                new QRCode(container, { text: qrisFinal, width: 200, height: 200 });
+                document.getElementById('display-total').innerText = "Rp " + window.selectedPackage.price.toLocaleString('id-ID');
+            }
+            [1, 2, 3].forEach(s => document.getElementById(`step-${s}`).classList.toggle('hidden', s !== n));
+        };
+
+        function renderPackages() {
+            const container = document.getElementById('package-list');
+            container.innerHTML = "";
+            window.selectedRegion.packages.forEach(pkg => {
+                const active = window.selectedPackage?.mbps === pkg.mbps;
+                const card = document.createElement('div');
+                card.onclick = () => { window.selectedPackage = pkg; renderPackages(); document.getElementById('btn-next').disabled = false; document.getElementById('btn-next').classList.remove('opacity-50'); };
+                card.className = `p-4 rounded-2xl border-2 cursor-pointer flex justify-between items-center transition-all ${active ? 'border-blue-600 bg-blue-50 shadow-md' : 'border-gray-100 bg-white hover:border-blue-100'}`;
+                card.innerHTML = `<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl flex items-center justify-center ${active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}"><i data-lucide="zap" class="w-5 h-5"></i></div><p class="font-black text-gray-800 text-lg">${pkg.mbps} Mbps</p></div><p class="font-black text-blue-600">Rp ${pkg.price.toLocaleString('id-ID')}</p>`;
+                container.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // KABARI ADMIN DI SUKSES PAGE
+        window.kirimWASukses = () => {
+            const noAdmin = document.getElementById('wa-admin-success').value;
+            const wifi = document.getElementById('wifi-name').value;
+            const sender = document.getElementById('sender-name').value;
+            const text = `Halo Admin, saya sudah bayar WiFi.\n\nSSID: ${wifi}\nPengirim: ${sender}\nWilayah: ${window.selectedRegion.name}\nPaket: ${window.selectedPackage.mbps} Mbps\nNominal: Rp ${window.selectedPackage.price.toLocaleString('id-ID')}\n\nBukti sudah di-upload. Tolong diproses ya.`;
+            window.open(`https://wa.me/${noAdmin}?text=${encodeURIComponent(text)}`, '_blank');
+        };
+
+        // ENGINE QRIS DINAMIS
+        function crc16(s) { let crc = 0xFFFF; for (let c = 0; c < s.length; c++) { crc ^= s.charCodeAt(c) << 8; for (let i = 0; i < 8; i++) { if (crc & 0x8000) crc = (crc << 1) ^ 0x1021; else crc = crc << 1; } } return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0'); }
+        function makeDynamicQris(qris, nominal) { let step1 = qris.substring(0, qris.length - 8).replace("010211", "010212"); let nomStr = nominal.toString(); let tag54 = "54" + nomStr.length.toString().padStart(2, '0') + nomStr; let res = step1.includes("5802ID") ? step1.split("5802ID").join(tag54 + "5802ID") + "6304" : step1 + tag54 + "6304"; return res + crc16(res); }
+        
+        window.handleProof = (i) => { 
+            if (!i.files[0]) return; 
+            const r = new FileReader(); 
+            r.onload = (e) => { 
+                window.proofBase64 = e.target.result; 
+                document.getElementById('upload-status-icon').className = "w-12 h-12 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-2 ring-4 ring-green-100 transition-all";
+                document.getElementById('upload-status-icon').innerHTML = '<i data-lucide="check" class="w-6 h-6"></i>';
+                document.getElementById('upload-text').innerText = "Bukti Terlampir";
+                document.getElementById('upload-text').className = "text-xs font-black text-green-600";
+                lucide.createIcons(); 
+                document.getElementById('btn-finish').disabled = false; 
+                document.getElementById('btn-finish').classList.remove('opacity-50'); 
+            }; 
+            r.readAsDataURL(i.files[0]); 
+        };
+
+        window.submitPayment = async () => {
+            document.getElementById('loading').classList.remove('hidden');
+            try {
+                await addDoc(collection(db, 'transactions'), {
+                    wifiName: document.getElementById('wifi-name').value,
+                    senderName: document.getElementById('sender-name').value,
+                    regionName: window.selectedRegion.name,
+                    mbps: window.selectedPackage.mbps,
+                    amount: window.selectedPackage.price,
+                    proofImage: window.proofBase64,
+                    timestamp: serverTimestamp()
+                });
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('view-success').classList.remove('hidden');
+            } catch (err) { alert("Gagal kirim."); document.getElementById('loading').classList.add('hidden'); }
+        };
+        lucide.createIcons();
+    </script>
+</body>
+</html>
