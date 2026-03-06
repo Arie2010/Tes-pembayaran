@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin WiFi - Manajemen Private</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Library untuk membaca QR Code dari gambar -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .sidebar-item.active { background-color: #eff6ff; color: #2563eb; border-right: 4px solid #2563eb; }
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="min-h-screen flex overflow-hidden">
+
+    <!-- Sidebar Navigasi -->
+    <aside class="w-64 bg-white border-r hidden md:flex flex-col h-screen shadow-sm z-20 flex-shrink-0">
+        <div class="p-6 border-b">
+            <h1 class="text-xl font-black text-blue-600 flex items-center gap-2">
+                <i data-lucide="shield-check"></i> WiFi Admin
+            </h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+            <button onclick="switchTab('transactions')" id="tab-transactions-btn" class="sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-blue-600 bg-blue-50 border-r-4 border-blue-600">
+                <i data-lucide="list-ordered" class="w-5 h-5"></i> Transaksi
+            </button>
+            <button onclick="switchTab('settings')" id="tab-settings-btn" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition-all border-r-4 border-transparent">
+                <i data-lucide="settings" class="w-5 h-5"></i> Pengaturan
+            </button>
+        </nav>
+        <div class="p-4 border-t text-center">
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Private Mode v4.0</p>
+        </div>
+    </aside>
+
+    <!-- Konten Utama -->
+    <main class="flex-1 flex flex-col h-screen relative overflow-hidden">
+        <header class="bg-white border-b p-6 flex justify-between items-center z-10 shadow-sm flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="document.querySelector('aside').classList.toggle('hidden')" class="md:hidden p-2 text-gray-500 bg-gray-100 rounded-lg">
+                    <i data-lucide="menu" class="w-5 h-5"></i>
+                </button>
+                <h2 id="page-title" class="text-xl font-bold text-gray-800">Daftar Transaksi Masuk</h2>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto relative">
+            <!-- VIEW TRANSAKSI -->
+            <section id="view-transactions" class="p-6 space-y-4">
+                <div id="transaction-list" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="col-span-full py-20 text-center text-gray-400 italic">Memuat data transaksi...</div>
+                </div>
+            </section>
+
+            <!-- VIEW PENGATURAN -->
+            <section id="view-settings" class="hidden p-6 animate-in fade-in duration-300 space-y-6 pb-20">
+                
+                <!-- PENGATURAN QRIS MASTER -->
+                <div class="bg-blue-600 rounded-3xl border p-6 shadow-lg text-white">
+                    <h3 class="font-black text-xl mb-1"><i data-lucide="qr-code" class="inline w-6 h-6 mr-2"></i>Master QRIS Dinamis</h3>
+                    <p class="text-sm text-blue-100 mb-6">Sistem akan otomatis mengubah nominal QRIS ini sesuai harga paket pelanggan.</p>
+                    
+                    <div class="bg-white p-5 rounded-2xl text-gray-800 flex flex-col md:flex-row gap-4 items-center">
+                        <label class="w-full md:w-auto inline-flex flex-col items-center justify-center px-6 py-4 bg-blue-50 border-2 border-dashed border-blue-300 text-blue-600 rounded-xl cursor-pointer hover:bg-blue-100 transition-all font-bold group">
+                            <i data-lucide="upload-cloud" class="w-8 h-8 mb-2 group-hover:scale-110 transition-transform"></i>
+                            Upload Foto QRIS
+                            <input type="file" accept="image/*" class="hidden" onchange="handleMasterQris(this)">
+                        </label>
+                        
+                        <div class="flex-1 w-full space-y-2">
+                            <label class="text-[10px] font-black text-gray-400 uppercase">Teks Kode QRIS Terbaca:</label>
+                            <textarea id="qris-string" onchange="updateQrisString(this.value)" rows="2" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-500 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Otomatis terisi saat upload..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MANAJEMEN WILAYAH PRIVATE -->
+                <div class="bg-white rounded-3xl border p-6 shadow-sm">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8 border-b pb-6">
+                        <div>
+                            <h3 class="font-black text-xl text-gray-800">Manajemen Wilayah Private</h3>
+                            <p class="text-xs text-gray-500 mt-1">Gunakan tombol 'Salin Link' untuk memberikan akses khusus wilayah.</p>
+                        </div>
+                        <button onclick="addRegion()" class="bg-slate-900 hover:bg-black text-white px-5 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg transition-all">
+                            <i data-lucide="plus" class="w-5 h-5"></i> Tambah Wilayah
+                        </button>
+                    </div>
+                    <div id="regions-container" class="space-y-6"></div>
+                    <div class="mt-8 pt-6 border-t border-gray-100">
+                        <button onclick="saveSettings()" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-xl transition-all flex items-center justify-center gap-2 hover:bg-blue-700">
+                            <i data-lucide="save" class="w-5 h-5"></i> Simpan Seluruh Pengaturan
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal Gambar Bukti -->
+    <div id="modal-image" class="hidden fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 cursor-zoom-out" onclick="this.classList.add('hidden')">
+        <div class="bg-white p-2 rounded-2xl relative max-w-4xl w-full" onclick="event.stopPropagation()">
+            <button onclick="document.getElementById('modal-image').classList.add('hidden')" class="absolute -top-4 -right-4 bg-red-500 text-white p-2 rounded-full shadow-lg"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <img id="full-image" src="" class="w-full h-auto max-h-[85vh] object-contain rounded-xl">
+        </div>
+    </div>
+
+    <!-- Firebase & Logic Scripts -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+
+        // =================================================================
+        // MASUKKAN FIREBASE CONFIG ANDA DI SINI
+        // =================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAG0Hvd_63itgiOXP4GBjgQG4MhkbWXedc",
+  authDomain: "wifi-pay.firebaseapp.com",
+  projectId: "wifi-pay",
+  storageBucket: "wifi-pay.firebasestorage.app",
+  messagingSenderId: "678974524617",
+  appId: "1:678974524617:web:908268390ed189362ad118"
+        };
+        // =================================================================
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let user = null;
+        let localSettings = { regions: [], qrisString: "" };
+
+        onAuthStateChanged(auth, (u) => {
+            if (u) { user = u; loadTransactions(); loadSettings(); }
+        });
+        signInAnonymously(auth);
+
+        // FUNGSI TAB SWITCHER
+        window.switchTab = (tab) => {
+            document.getElementById('view-transactions').classList.toggle('hidden', tab !== 'transactions');
+            document.getElementById('view-settings').classList.toggle('hidden', tab !== 'settings');
+            
+            document.getElementById('tab-transactions-btn').className = tab === 'transactions' ? "sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-blue-600 bg-blue-50 border-r-4 border-blue-600" : "sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-gray-500 border-r-4 border-transparent";
+            document.getElementById('tab-settings-btn').className = tab === 'settings' ? "sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-blue-600 bg-blue-50 border-r-4 border-blue-600" : "sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-gray-500 border-r-4 border-transparent";
+            
+            document.getElementById('page-title').innerText = tab === 'transactions' ? 'Daftar Transaksi' : 'Pengaturan Private';
+        };
+
+        // LOAD DATA TRANSAKSI
+        function loadTransactions() {
+            onSnapshot(query(collection(db, 'transactions')), (snapshot) => {
+                const container = document.getElementById('transaction-list');
+                container.innerHTML = snapshot.empty ? '<div class="col-span-full py-20 text-center text-gray-400 italic">Belum ada transaksi pelanggan</div>' : '';
+                
+                const data = snapshot.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                
+                data.forEach(tr => {
+                    const time = tr.timestamp ? new Date(tr.timestamp.seconds * 1000).toLocaleString('id-ID', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : 'Baru saja';
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 transition-all hover:shadow-md";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div><h4 class="font-black text-gray-900">${tr.wifiName}</h4><p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider">${tr.regionName}</p></div>
+                            <span class="text-[10px] text-gray-400 font-medium">${time}</span>
+                        </div>
+                        <div class="bg-gray-50 rounded-2xl p-4 grid grid-cols-2 gap-3 text-sm border border-gray-100">
+                            <div><p class="text-gray-400 text-[9px] font-black uppercase mb-0.5 tracking-widest">Pengirim</p><p class="font-bold truncate">${tr.senderName}</p></div>
+                            <div><p class="text-gray-400 text-[9px] font-black uppercase mb-0.5 tracking-widest">Paket</p><p class="font-black text-blue-600">${tr.mbps} Mbps</p></div>
+                            <div class="col-span-2 pt-2 border-t border-gray-200 mt-1"><p class="text-gray-400 text-[9px] font-black uppercase mb-0.5 tracking-widest">Nominal Transfer</p><p class="font-black text-lg text-green-600">Rp ${tr.amount.toLocaleString('id-ID')}</p></div>
+                        </div>
+                        <button onclick="viewImage('${tr.proofImage}')" class="w-full bg-blue-50 text-blue-600 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all"><i data-lucide="image" class="w-4 h-4"></i> Cek Bukti Transfer</button>
+                    `;
+                    container.appendChild(card);
+                });
+                lucide.createIcons();
+            });
+        }
+
+        // FUNGSI QRIS MASTER
+        window.handleMasterQris = (input) => {
+            if (!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+                    if (code) {
+                        document.getElementById('qris-string').value = code.data;
+                        localSettings.qrisString = code.data;
+                        alert("Berhasil membaca kode QRIS!");
+                    } else { alert("Gagal membaca QRIS. Pastikan gambar jelas."); }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        };
+
+        // FUNGSI MANAJEMEN WILAYAH
+        window.renderRegions = () => {
+            const container = document.getElementById('regions-container');
+            container.innerHTML = '';
+            localSettings.regions.forEach((reg, rIdx) => {
+                const div = document.createElement('div');
+                div.className = "p-6 bg-slate-50 rounded-2xl border border-slate-200 relative mb-4 transition-all hover:border-blue-300 shadow-sm";
+                div.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                        <div class="flex-1 w-full pr-0 md:pr-12">
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nama Wilayah (Sangat Penting)</label>
+                            <input type="text" value="${reg.name}" onchange="updateRegName(${rIdx}, this.value)" class="w-full p-4 font-bold rounded-xl border-2 border-white focus:border-blue-500 outline-none shadow-inner">
+                        </div>
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <button onclick="copyRegionLink('${reg.name}')" class="flex-1 bg-blue-50 text-blue-600 px-4 py-4 rounded-xl hover:bg-blue-100 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"><i data-lucide="copy" class="w-4 h-4"></i> Salin Link Private</button>
+                            <button onclick="removeRegion(${rIdx})" class="bg-red-50 text-red-500 p-4 rounded-xl hover:bg-red-100 transition-all active:scale-95"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                        </div>
+                    </div>
+                    <div id="packages-${rIdx}" class="space-y-3"></div>
+                    <button onclick="addPkg(${rIdx})" class="w-full mt-4 border-2 border-dashed border-blue-200 bg-blue-50 text-blue-600 py-3 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all">+ Tambah Paket Baru</button>
+                `;
+                container.appendChild(div);
+                renderPackages(rIdx);
+            });
+            lucide.createIcons();
+        };
+
+        window.renderPackages = (rIdx) => {
+            const container = document.getElementById(`packages-${rIdx}`);
+            localSettings.regions[rIdx].packages.forEach((pkg, pIdx) => {
+                const div = document.createElement('div');
+                div.className = "flex gap-3 items-center bg-white p-3 rounded-xl border shadow-sm";
+                div.innerHTML = `
+                    <div class="flex-1"><label class="text-[8px] text-gray-400 uppercase font-black">Speed (Mbps)</label><input type="number" value="${pkg.mbps}" onchange="updPkg(${rIdx},${pIdx},'mbps',this.value)" class="w-full border-none p-1 font-black text-lg bg-transparent outline-none"></div>
+                    <div class="w-px h-8 bg-gray-100"></div>
+                    <div class="flex-[2]"><label class="text-[8px] text-gray-400 uppercase font-black">Harga Unik (Rp)</label><input type="number" value="${pkg.price}" onchange="updPkg(${rIdx},${pIdx},'price',this.value)" class="w-full border-none p-1 font-black text-lg text-blue-600 bg-transparent outline-none"></div>
+                    <button onclick="remPkg(${rIdx},${pIdx})" class="text-gray-300 hover:text-red-500 transition-colors p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+                `;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+        };
+
+        // FUNGSI SALIN LINK PRIVATE
+        window.copyRegionLink = (name) => {
+            // Mengambil URL index.html secara otomatis berdasarkan lokasi admin.html
+            const baseUrl = window.location.origin + window.location.pathname.replace('admin.html', 'index.html');
+            const fullLink = `${baseUrl}?w=${encodeURIComponent(name)}`;
+            
+            // Clipboard fallback
+            const el = document.createElement('textarea');
+            el.value = fullLink;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            
+            alert(`Berhasil Menyalin Link!\nWilayah: ${name}\n\nSilakan kirimkan link ini hanya kepada pelanggan di wilayah tersebut.`);
+        };
+
+        // EVENT HANDLERS
+        window.addRegion = () => { localSettings.regions.push({name: 'Wilayah Baru', packages: [{mbps:10, price:150000}]}); renderRegions(); };
+        window.removeRegion = (i) => { if(confirm('Hapus seluruh wilayah ini?')) { localSettings.regions.splice(i,1); renderRegions(); } };
+        window.updateRegName = (i,v) => localSettings.regions[i].name = v;
+        window.addPkg = (i) => { localSettings.regions[i].packages.push({mbps:0, price:0}); renderRegions(); };
+        window.updPkg = (ri,pi,k,v) => localSettings.regions[ri].packages[pi][k] = parseInt(v) || 0;
+        window.remPkg = (ri,pi) => { localSettings.regions[ri].packages.splice(pi,1); renderRegions(); };
+        window.updateQrisString = (v) => localSettings.qrisString = v;
+        window.viewImage = (src) => { document.getElementById('full-image').src = src; document.getElementById('modal-image').classList.remove('hidden'); };
+
+        // FIREBASE SYNC
+        window.saveSettings = async () => {
+            localSettings.qrisString = document.getElementById('qris-string').value;
+            try {
+                await setDoc(doc(db, 'config', 'settings'), localSettings);
+                alert("Pengaturan Berhasil Disimpan di Server!");
+            } catch (err) { alert("Gagal menyimpan. Cek koneksi internet."); }
+        };
+
+        async function loadSettings() {
+            const s = await getDoc(doc(db, 'config', 'settings'));
+            if (s.exists()) {
+                localSettings = s.data();
+                document.getElementById('qris-string').value = localSettings.qrisString || "";
+                renderRegions();
+            }
+        }
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>
